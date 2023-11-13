@@ -33,20 +33,27 @@
 
 
 
-        function geocodeAddress(address, callback) {
-            // Kakao Maps 지오코딩 객체 생성 및 주소 변환 로직
-            var geocoder = new kakao.maps.services.Geocoder();
-            var mapContainer = document.querySelector('#' + sectionId + ' .map');
+	function geocodeAddress(address, sectionId, callback) {
+	    // Kakao Maps 지오코딩 객체 생성 및 주소 변환 로직
+	    var geocoder = new kakao.maps.services.Geocoder();
+	    var mapContainer = document.querySelector('#' + sectionId + ' .map');
+	
+	    geocoder.addressSearch(address, function (result, status) {
+	        if (status === kakao.maps.services.Status.OK) {
+	            var coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+	            // 'map' 객체를 'maps[sectionId]'로 변경하여 각 섹션에 맞는 지도 객체 사용
+	            var map = maps[sectionId]; 
+	            if (!map) {
+	                console.error('Map object not found for section:', sectionId);
+	                return;
+	            }
+	            callback(coords, map); // 좌표와 지도 객체 반환
+	        } else {
+	            console.error('Failed to get coordinates for address:', address);
+	        }
+	    });
+	}
 
-            geocoder.addressSearch(address, function (result, status) {
-                if (status === kakao.maps.services.Status.OK) {
-                    var coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-                    callback(coords, map); // 좌표와 지도 객체 반환
-                } else {
-                    console.error('Failed to get coordinates for address:', address);
-                }
-            });
-        }
 
 
         function findRoute() {
