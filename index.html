@@ -34,18 +34,19 @@
 
 
 
-	function geocodeAddress(address, sectionId, callback) {
+	function geocodeAddress(address, callback) {
 	    // Kakao Maps 지오코딩 객체 생성 및 주소 변환 로직
 	    var geocoder = new kakao.maps.services.Geocoder();
-	    var mapContainer = document.querySelector('#' + sectionId + ' .map');
+	    // 페이지에 하나의 지도 컨테이너만 있다고 가정
+	    var mapContainer = document.querySelector('.map'); 
 	
 	    geocoder.addressSearch(address, function (result, status) {
 	        if (status === kakao.maps.services.Status.OK) {
 	            var coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-	            // 'map' 객체를 'maps[sectionId]'로 변경하여 각 섹션에 맞는 지도 객체 사용
-	            var map = maps[sectionId]; 
+	            // 'map' 객체는 페이지에 단일 지도로 존재한다고 가정
+	            var map = map; // 이 부분은 실제 페이지의 지도 객체 구조에 따라 달라질 수 있습니다.
 	            if (!map) {
-	                console.error('Map object not found for section:', sectionId);
+	                console.error('Map object not found');
 	                return;
 	            }
 	            callback(coords, map); // 좌표와 지도 객체 반환
@@ -54,31 +55,33 @@
 	        }
 	    });
 	}
+	
+	
+	
+	
+	function findRoute() {
+	    // 사용자 입력 주소를 좌표로 변환하여 경로 찾기
+	    var startAddress = document.getElementById('start-location').value;
+	    var endAddress = document.getElementById('end-location').value;
+	
+	    geocodeAddress(startAddress, function(startCoords) {
+	        if (!startCoords) {
+	            alert('출발지 주소를 찾을 수 없습니다.');
+	            return;
+	        }
+	
+	        geocodeAddress(endAddress, function(endCoords) {
+	            if (!endCoords) {
+	                alert('목적지 주소를 찾을 수 없습니다.');
+	                return;
+	            }
+	
+	            // 여기에 경로 찾기 로직을 추가
+	            searchRoute(startCoords, endCoords);
+	        });
+	    });
+	}
 
-
-
-        function findRoute() {
-            // 사용자 입력 주소를 좌표로 변환하여 경로 찾기
-            var startAddress = document.getElementById('start-location').value;
-            var endAddress = document.getElementById('end-location').value;
-
-            geocodeAddress(startAddress, function(startCoords) {
-                if (!startCoords) {
-                    alert('출발지 주소를 찾을 수 없습니다.');
-                    return;
-                }
-
-                geocodeAddress(endAddress, function(endCoords) {
-                    if (!endCoords) {
-                        alert('목적지 주소를 찾을 수 없습니다.');
-                        return;
-                    }
-
-                    // 여기에 경로 찾기 로직을 추가
-                    searchRoute(startCoords, endCoords);
-                });
-            });
-        }
 
         function searchRoute(startCoords, endCoords) {
             // ODSay API를 사용하여 경로 
