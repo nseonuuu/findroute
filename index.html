@@ -9,7 +9,40 @@
     <title>길찾기 결과 지도에 표출하기</title>
 </head>
 <body>
-<div id="map" style="width:100%;height:400px;"></div>
+		<div id="Section1" class="content-section">
+		    <div class="controls">
+		        <input class="pac-input" type="text" placeholder="위치 검색">
+		        <button class="homeButton" onclick="setCenter('Section1')">처음으로</button>
+		        <button class="trafficButton" onclick="toggleTraffic('Section1')">교통정보 표시</button>
+		        <button class="clearButton" onclick="clearMap('Section1')">마커 지우기</button>
+		    </div>
+		    <div class="city-section">
+		        <div class="map"></div>
+		        <div class="city-buttons">
+		        <button onclick="loadCityData('서울', 'Section1')">서울</button><br>
+			<button onclick="loadCityData('부산', 'Section1')">부산</button><br>
+			<button onclick="loadCityData('대구', 'Section1')">대구</button><br>
+			<button onclick="loadCityData('인천', 'Section1')">인천</button><br>
+			<button onclick="loadCityData('광주', 'Section1')">광주</button><br>
+			<button onclick="loadCityData('대전', 'Section1')">대전</button><br>
+			<button onclick="loadCityData('세종', 'Section1')">세종</button><br>
+			<button onclick="loadCityData('울산', 'Section1')">울산</button><br>
+			<button onclick="loadCityData('경남', 'Section1')">경남</button><br>
+		    </div>
+		    <div class="city-buttons">
+			<button onclick="loadCityData('경북', 'Section1')">경북</button><br>
+			<button onclick="loadCityData('경기남부', 'Section1')">경기남부</button><br>
+			<button onclick="loadCityData('경기북부', 'Section1')">경기북부</button><br>
+			<button onclick="loadCityData('강원', 'Section1')">강원</button><br>
+			<button onclick="loadCityData('충북', 'Section1')">충북</button><br>
+			<button onclick="loadCityData('충남', 'Section1')">충남</button><br>
+			<button onclick="loadCityData('전남', 'Section1')">전남</button><br>
+			<button onclick="loadCityData('전북', 'Section1')">전북</button><br>
+			<button onclick="loadCityData('제주', 'Section1')">제주</button><br>
+		    </div>
+		</div>
+
+	
 <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=a035643f71b9f10705041cf4f38eb95b&libraries=services,clusterer"></script>
 
 <script>
