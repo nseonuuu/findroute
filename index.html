@@ -1,190 +1,188 @@
 <!DOCTYPE html>
-<html lang="ko">
-  <head>
-    <title>쾌적한 경로탐색</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+<html>
+<head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="styles.css">
-    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=a035643f71b9f10705041cf4f38eb95b&libraries=services,clusterer"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+    <title>길찾기 결과 지도에 표출하기</title>
+</head>
+<body>
+<div id="map" style="width:100%;height:400px;"></div>
+<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=a035643f71b9f10705041cf4f38eb95b&libraries=services,clusterer"></script>
+
+<script>
+ 
+	var mapOptions = {
+		center: new kakao.maps.LatLng(37.3595704, 127.105399),
+		zoom: 10
+	};
+
+	var map = new kakao.maps.Map('map', mapOptions);
 	
-  </head>
-  <body>
-    <div class="map"></div>
-    <div id="route-finder">
-        <input type="text" id="start-location" placeholder="출발지를 입력하세요">
-        <input type="text" id="end-location" placeholder="목적지를 입력하세요">
-        <button onclick="findRoute()">경로 찾기</button>
-    </div>
-    <div id="route-info"></div>
-
-    <script>
-
-        var container = document.querySelector('.map'); //지도를 담을 영역의 DOM 레퍼런스
-        var options = { //지도를 생성할 때 필요한 기본 옵션
-                    center: new kakao.maps.LatLng(36.4295023415802, 128.067007021683), //지도의 중심좌표.
-                    level: 13 //지도의 레벨(확대, 축소 정도)
-
-        };
-
-        var map = new kakao.maps.Map(container, options); //지도 생성 및 객체 리턴
-        var maps = {}; // 모든 지도 객체를 저장할 객체
-        
-
-
-
-	function geocodeAddress(address, callback) {
-	    // Kakao Maps 지오코딩 객체 생성 및 주소 변환 로직
-	    var geocoder = new kakao.maps.services.Geocoder();
-	    // 페이지에 하나의 지도 컨테이너만 있다고 가정
-	    var mapContainer = document.querySelector('.map'); 
+	var sx = 126.93737555322481;
+	var sy = 37.55525165729346;
+	var ex = 126.88265238619182;
+	var ey = 37.481440035175375;
 	
-	    geocoder.addressSearch(address, function (result, status) {
-	        if (status === kakao.maps.services.Status.OK) {
-	            var coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-	            // 'map' 객체는 페이지에 단일 지도로 존재한다고 가정
-	            var map = map; // 이 부분은 실제 페이지의 지도 객체 구조에 따라 달라질 수 있습니다.
-	            if (!map) {
-	                console.error('Map object not found');
-	                return;
-	            }
-	            callback(coords, map); // 좌표와 지도 객체 반환
-	        } else {
-	            console.error('Failed to get coordinates for address:', address);
-	        }
-	    });
+	function searchPubTransPathAJAX() {
+		var xhr = new XMLHttpRequest();
+		//ODsay apiKey 입력
+		var url = "https://api.odsay.com/v1/api/searchPubTransPathT?SX="+sx+"&SY="+sy+"&EX="+ex+"&EY="+ey+"&apiKey=C+g5i6mKpx3QWTafGpAEBg"
+		xhr.send();
+		xhr.onreadystatechange = function() {
+			if (xhr.readyState == 4 && xhr.status == 200) {
+			console.log( JSON.parse(xhr.responseText) ); // <- xhr.responseText 로 결과를 가져올 수 있음
+			//노선그래픽 데이터 호출
+			callMapObjApiAJAX((JSON.parse(xhr.responseText))["result"]["path"][0].info.mapObj);
+			}
+		}
 	}
 	
+	//길찾기 API 호출
+	searchPubTransPathAJAX();
 	
+	function callMapObjApiAJAX(mabObj){
+		var xhr = new XMLHttpRequest();
+		//ODsay apiKey 입력
+		var url = "https://api.odsay.com/v1/api/loadLane?mapObject=0:0@"+mabObj+"&apiKey=C+g5i6mKpx3QWTafGpAEBg";
+		xhr.open("GET", url, true);
+		xhr.send();
+		xhr.onreadystatechange = function() {
+			if (xhr.readyState == 4 && xhr.status == 200) {
+				var resultJsonData = JSON.parse(xhr.responseText);
+				drawKakaoMarker(sx,sy);					// 출발지 마커 표시
+				drawKakaoMarker(ex,ey);					// 도착지 마커 표시
+				drawKakaoPolyLine(resultJsonData);		// 노선그래픽데이터 지도위 표시
+				// boundary 데이터가 있을경우, 해당 boundary로 지도이동
+				if(resultJsonData.result.boundary){
+						var boundary = new kakao.maps.LatLngBounds(
+				                new kakao.maps.LatLng(resultJsonData.result.boundary.top, resultJsonData.result.boundary.left),
+				                new kakao.maps.LatLng(resultJsonData.result.boundary.bottom, resultJsonData.result.boundary.right)
+				                );
+						map.panToBounds(boundary);
+				}
+			}
+		}
+	}
 	
+	// 지도위 마커 표시해주는 함수
+	function drawKakaoMarker(x,y){
+		var marker = new kakao.maps.Marker({
+		    position: new kakao.maps.LatLng(y, x),
+		    map: map
+		});
+	}
 	
-	function findRoute() {
-	    // 사용자 입력 주소를 좌표로 변환하여 경로 찾기
-	    var startAddress = document.getElementById('start-location').value;
-	    var endAddress = document.getElementById('end-location').value;
-	
-	    geocodeAddress(startAddress, function(startCoords) {
-	        if (!startCoords) {
-	            alert('출발지 주소를 찾을 수 없습니다.');
-	            return;
-	        }
-	
-	        geocodeAddress(endAddress, function(endCoords) {
-	            if (!endCoords) {
-	                alert('목적지 주소를 찾을 수 없습니다.');
-	                return;
-	            }
-	
-	            // 여기에 경로 찾기 로직을 추가
-	            searchRoute(startCoords, endCoords);
-	        });
-	    });
+	// 노선그래픽 데이터를 이용하여 지도위 폴리라인 그려주는 함수
+	function drawKakaoPolyLine(data){
+		var lineArray;
+		
+		for(var i = 0 ; i < data.result.lane.length; i++){
+			for(var j=0 ; j <data.result.lane[i].section.length; j++){
+				lineArray = null;
+				lineArray = new Array();
+				for(var k=0 ; k < data.result.lane[i].section[j].graphPos.length; k++){
+					lineArray.push(new kakao.maps.LatLng(data.result.lane[i].section[j].graphPos[k].y, data.result.lane[i].section[j].graphPos[k].x));
+				}
+				
+			//지하철결과의 경우 노선에 따른 라인색상 지정하는 부분 (1,2호선의 경우만 예로 들음)
+				if(data.result.lane[i].type == 1){
+					var polyline = new kakao.maps.Polyline({
+					    map: map,
+					    path: lineArray,
+					    strokeWeight: 3,
+					    strokeColor: '#003499'
+					});
+				}else if(data.result.lane[i].type == 2){
+					var polyline = new kakao.maps.Polyline({
+					    map: map,
+					    path: lineArray,
+					    strokeWeight: 3,
+					    strokeColor: '#37b42d'
+					});
+				}else{
+					var polyline = new kakao.maps.Polyline({
+					    map: map,
+					    path: lineArray,
+					    strokeWeight: 3
+					});
+				}
+			}
+		}
 	}
 
+    // 주소를 좌표로 변환하는 함수
+    function geocodeAddress(address, callback) {
+        var geocoder = new kakao.maps.services.Geocoder();
 
-        function searchRoute(startCoords, endCoords) {
-            // ODSay API를 사용하여 경로 
-            var apiKey = 'YOUR_ODSAY_API_KEY'; // ODSay API 키
-            var url = `https://api.odsay.com/v1/api/searchPubTransPathT?SX=${startCoords.getLng()}&SY=${startCoords.getLat()}&EX=${endCoords.getLng()}&EY=${endCoords.getLat()}&apiKey=${apiKey}`;
-
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    // 경로 정보 처리
-                    displayRoute(data);
-                })
-                .catch(error => console.error('Error:', error));
-        }
-
-        function displayRoute(data) {
-            // 경로 정보를 화면에 표시하는 함수
-            // 예제로 간단한 경로 정보를 출력합니다.
-            // 여기에 더 복잡한 로직을 추가하여 사용자에게 상세한 경로 정보를 제공할 수 있습니다.
-            var routeInfo = data.result.path[0].info; // 첫 번째 경로의 정보
-            var message = `총 거리: ${routeInfo.totalDistance}m, 총 소요시간: ${routeInfo.totalTime}분`;
-
-            // HTML에 경로 정보를 표시
-            document.getElementById('route-info').innerHTML = message;
-        }
-
-        var protestAreas = [
-            // 시위 지역 데이터 예시
-        ];
-
-        function checkRouteAgainstProtests(route) {
-            // 경로와 시위 지역의 충돌 체크
-            // route 객체에는 경로의 각 점에 대한 좌표가 포함되어 있어야 합니다.
-            // 여기서는 예시로 간단한 충돌 체크 로직을 구현합니다.
-
-            // 각 경로의 점을 순회하며 시위 지역과의 거리를 비교
-            for (let point of route.points) {
-                for (let area of protestAreas) {
-                    var distance = getDistanceBetweenPoints(point, area);
-                    if (distance < area.radius) {
-                        return true; // 충돌 발생
-                    }
-                }
-            }
-            return false; // 충돌 없음
-        }
-
-        function findAlternativeRoute(startCoords, endCoords) {
-            // 대체 경로 탐색
-            // ODSay API를 다시 호출하여 대체 경로를 요청하는 로직 구현
-            // startCoords와 endCoords 사이의 대체 경로를 찾습니다.
-        }
-
-        function displayRoute(data) {
-            var route = data.result.path[0]; // 첫 번째 경로
-
-            if (checkRouteAgainstProtests(route)) {
-                findAlternativeRoute(startCoords, endCoords); // 대체 경로 탐색
+        geocoder.addressSearch(address, function (result, status) {
+            if (status === kakao.maps.services.Status.OK) {
+                var coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+                callback(coords); // 콜백에 좌표만 전달
             } else {
-                // 경로 표시 로직
-                // 예: 지도에 경로 표시, 경로 세부 정보 제공 등
+                console.error('Failed to get coordinates for address:', address);
             }
-        }
+        });
+    }
 
-        function loadAndPlotData(cityName, sectionId, map) {
-            const filename = `RT_${cityCodeMapping[cityName]}_Update.csv`;
-            var markers = []; // 섹션별 마커 관리
-            var circles = []; // 섹션별 원 관리
-            protestAreas = []; // protestAreas 배열 초기화
+    // ODSay API를 사용하여 반경 내의 지하철역과 버스 정류장 조회
+    function getStationsInRadius(x, y, radius, map, callback) {
+        const url = `https://api.odsay.com/v1/api/pointBusStation?apiKey=${ODSAY_API_KEY}&x=${x}&y=${y}&radius=${radius}`;
 
-            fetch(filename)
-                .then(response => response.text())
-                .then(data => {
-                    const results = Papa.parse(data, {
-                        header: true,
-                        skipEmptyLines: true
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.result) {
+                    data.result.lane.forEach(station => {
+                        const stationType = station.stationClass;
+                        const stationName = station.stationName;
+                        const stationCoords = new kakao.maps.LatLng(station.y, station.x);
+
+                        // 지도에 정류장 마커 추가
+                        var marker = new kakao.maps.Marker({
+                            position: stationCoords,
+                            map: map,
+                            title: stationName
+                        });
+
+                        // 추가적인 로직 (예: 마커 클릭 이벤트 추가)
+                        kakao.maps.event.addListener(marker, 'click', function() {
+                            // 마커 클릭 시 행동 (예: 인포윈도우 표시)
+                        });
                     });
+                }
 
-                    results.data.forEach(row => {
-                        if (row['관련 지역'] && row['신고 인원']) {
-                            let address = row['관련 지역'];
-                            address = address.replace(/\s*등\s*$/, '');  
-                            address = cityName + " " + address;
+                if (callback) callback();
+            })
+            .catch(error => console.error('Error fetching ODSay API:', error));
+    }
+        // 집회 데이터를 처리하고 지하철역 및 버스 정류장 조회
+    function loadAndPlotData(cityName, map) {
+        const filename = `RT_${cityCodeMapping[cityName]}_Update.csv`;
+        var markers = [];
+        var circles = [];
 
-                            const population = parseInt(row['신고 인원'], 10);
-                            if (isNaN(population)) {
-                                console.warn('Invalid population value for address:', address);
+        fetch(filename)
+            .then(response => response.text())
+            .then(data => {
+                const results = Papa.parse(data, { header: true, skipEmptyLines: true });
+
+                results.data.forEach(row => {
+                    if (row['관련 지역'] && row['신고 인원']) {
+                        let address = cityName + " " + row['관련 지역'].replace(/\s*등\s*$/, '');
+
+                        geocodeAddress(address, function (location) {
+                            if (!location) {
+                                console.error('Invalid coordinates for address:', address);
                                 return;
                             }
 
-                            geocodeAddress(address, sectionId, function (location) {
-                                if (!location || isNaN(location.Ma) || isNaN(location.La)) {
-                                    console.error('Invalid coordinates for address:', address);
-                                    return;
-                                }
+                            const radius = Math.sqrt(parseInt(row['신고 인원'], 10)) * 10;
+                            getStationsInRadius(location.x, location.y, radius, function (stationsData) {
+                                // 여기서 stationsData 처리 로직 구현
+                                // 예: 지하철역과 버스 정류장을 지도에 표시
+                            });
 
-                                const radius = Math.sqrt(population) * 10;
-                                if (isNaN(radius)) {
-                                    console.error('Invalid radius value for address:', address);
-                                    return;
-                                }
-
-                                var circle = new kakao.maps.Circle({
+                            var circle = new kakao.maps.Circle({
                                     center: new kakao.maps.LatLng(location.Ma, location.La),
                                     radius: radius,
                                     strokeWeight: 2,
@@ -203,17 +201,13 @@
                                 });
                                 markers.push(marker);
 
-                                // protestAreas 배열에 시위 지역 정보 추가
-                                protestAreas.push({
-                                    lat: location.Ma,
-                                    lng: location.La,
-                                    radius: Math.sqrt(population) * 10
-                                });
-                            });
-                        }
-                    });
 
-                    var html = '<table class="dataframe">';
+                        });
+                    }
+                });
+
+                // 기존 HTML 테이블 표시 로직...
+                var html = '<table class="dataframe">';
                     html += '<thead><tr>';
                     results.meta.fields.forEach(field => {
                         html += '<th>' + field + '</th>';
@@ -228,19 +222,11 @@
                     });
                     html += '</tbody></table>';
 
-                    document.querySelector('#' + sectionId + ' .dataframe-container').innerHTML = html;
+                    document.querySelector('#' + ' .dataframe-container').innerHTML = html;
                 })
-                .catch(error => {
-                    console.error('Error loading or parsing the CSV:', error);
-                });
-        }
-
-
+            .catch(error => console.error('Error loading or parsing the CSV:', error));
+    }
 
     </script>
-
-  </body>
-
+</body>
 </html>
-
-
