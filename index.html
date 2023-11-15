@@ -61,6 +61,17 @@
 	var sy = 37.55525165729346;
 	var ex = 126.88265238619182;
 	var ey = 37.481440035175375;
+
+	function setCenter(sectionId) {           
+	    var moveLatLon = new kakao.maps.LatLng(36.4295023415802, 128.067007021683);
+	    var mapContainer = document.querySelector('#' + sectionId + ' .map');
+	    var map = new kakao.maps.Map(mapContainer, options); // options는 지도 생성에 필요한 기본 옵션
+	    map.setCenter(moveLatLon);
+	    map.setLevel(13);
+	}
+	
+
+
 	
 	function searchPubTransPathAJAX() {
 		var xhr = new XMLHttpRequest();
@@ -266,6 +277,73 @@
             .catch(error => console.error('Error loading or parsing the CSV:', error));
     }
 
+	// Mapping of city names to their codes
+	const cityCodeMapping = {
+	    "서울": "SU",
+	    "부산": "PS",
+	    "대구": "DG",
+	    "인천": "IC",
+	    "광주": "KJ",
+	    "대전": "DJ",
+	    "울산": "WS",
+	    "세종": "SJ",
+	    "경기남부": "KN",
+	    "경기북부": "KB",
+	    "강원": "KW",
+	    "충북": "CB",
+	    "충남": "CN",
+	    "전북": "JB",
+	    "전남": "JN",
+	    "경북": "SB",
+	    "경남": "SN",
+	    "제주": "JJ"
+	};
+	
+	const cityCoordinates = {
+	    "서울": { lat: 37.55191813, lng: 126.9918238, zoom: 9 },
+	    "부산": { lat: 35.21033858, lng: 129.0691138, zoom: 9 },
+	    "대구": { lat: 35.8298146, lng: 128.5653587, zoom: 9 },
+	    "인천": { lat: 37.58457102, lng: 126.3755151, zoom: 9 },
+	    "광주": { lat: 35.15572822, lng: 126.8354348, zoom: 9 },
+	    "대전": { lat: 36.3397636, lng: 127.3940388, zoom: 9 },
+	    "울산": { lat: 35.55422196, lng: 129.237579, zoom: 9 },
+	    "세종": { lat: 36.56072897, lng: 127.258722, zoom: 9 },
+	    "경기남부": { lat: 37.53434923, lng: 127.1810501, zoom: 11 },
+	    "경기북부": { lat: 37.53434923, lng: 127.1810501, zoom: 11 },
+	    "강원": { lat: 37.71904264, lng: 128.3008969, zoom: 11 },
+	    "충북": { lat: 36.73877678, lng: 127.8313457, zoom: 11 },
+	    "충남": { lat: 36.52940199, lng: 126.8497393, zoom: 11 },
+	    "전북": { lat: 35.71581062, lng: 127.1427384, zoom: 11 },
+	    "전남": { lat: 34.87817002, lng: 126.9052332, zoom: 11 },
+	    "경북": { lat: 36.34862579, lng: 128.748716, zoom: 11 },
+	    "경남": { lat: 35.32449891, lng: 128.2611748, zoom: 11 },
+	    "제주": { lat: 33.38699923, lng: 126.5538395, zoom: 10 }
+	};
+	
+	
+	
+	function loadCityData(city, sectionId) {
+	    clearMap(sectionId);
+	    const cityData = cityCoordinates[city];
+	    var map = maps[sectionId]; // 기존 지도 객체 사용
+	
+	    if (!map) {
+	        console.error("지도 객체가 없습니다:", sectionId);
+	        return;
+	    }
+		
+	    map.setCenter(new kakao.maps.LatLng(cityData.lat, cityData.lng));
+	    map.setLevel(cityData.zoom);
+	
+	    if (cityCodeMapping[city]) {
+	        loadAndPlotData(city, sectionId, map); // 이미 생성된 지도 객체 전달
+	    } else {
+	        console.log("Data for", city, "is not yet implemented or the city is not recognized.");
+	    }
+	}
+
+
+	
     </script>
 </body>
 </html>
