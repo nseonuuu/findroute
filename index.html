@@ -284,18 +284,20 @@
 
 	
     // 주소를 좌표로 변환하는 함수
-    function geocodeAddress(address, callback) {
-        var geocoder = new kakao.maps.services.Geocoder();
+    function geocodeAddress(address) {
+	    return new Promise((resolve, reject) => {
+	        var geocoder = new kakao.maps.services.Geocoder();
+	        geocoder.addressSearch(address, function (result, status) {
+	            if (status === kakao.maps.services.Status.OK) {
+	                var coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+	                resolve(coords);
+	            } else {
+	                reject('Failed to get coordinates for address: ' + address);
+	            }
+	        });
+	    });
+	}
 
-        geocoder.addressSearch(address, function (result, status) {
-            if (status === kakao.maps.services.Status.OK) {
-                var coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-                callback(coords); // 콜백에 좌표만 전달
-            } else {
-                console.error('Failed to get coordinates for address:', address);
-            }
-        });
-    }
 
     // ODSay API를 사용하여 반경 내의 지하철역과 버스 정류장 조회
     function getStationsInRadius(x, y, radius, map, callback) {
@@ -329,33 +331,36 @@
             .catch(error => console.error('Error fetching ODSay API:', error));
     }
     // 집회 데이터를 처리하고 지하철역 및 버스 정류장 조회
-    function loadAndPlotData(cityName, map) {
+function loadAndPlotData(cityName, map) {
+    return new Promise((resolve, reject) => {
         const filename = `RT_${cityCodeMapping[cityName]}_Update.csv`;
         var markers = [];
         var circles = [];
+        var locations = [];
+        var radii = [];
 
         fetch(filename)
             .then(response => response.text())
             .then(data => {
                 const results = Papa.parse(data, { header: true, skipEmptyLines: true });
+                var stationPromises = [];
 
                 results.data.forEach(row => {
                     if (row['관련 지역'] && row['신고 인원']) {
                         let address = cityName + " " + row['관련 지역'].replace(/\s*등\s*$/, '');
 
-                        geocodeAddress(address, function (location) {
-                            if (!location) {
-                                console.error('Invalid coordinates for address:', address);
-                                return;
-                            }
+                        var promise = geocodeAddress(address)
+                            .then(location => {
+                                if (!location) {
+                                    console.error('Invalid coordinates for address:', address);
+                                    return;
+                                }
 
-                            const radius = Math.sqrt(parseInt(row['신고 인원'], 10)) * 10;
-                            getStationsInRadius(location.x, location.y, radius, function (stationsData) {
-                                // 여기서 stationsData 처리 로직 구현
-                                // 예: 지하철역과 버스 정류장을 지도에 표시
-                            });
+                                const radius = Math.sqrt(parseInt(row['신고 인원'], 10)) * 10;
+                                locations.push({ x: location.Ma, y: location.La });
+                                radii.push(radius);
 
-                            var circle = new kakao.maps.Circle({
+                                var circle = new kakao.maps.Circle({
                                     center: new kakao.maps.LatLng(location.Ma, location.La),
                                     radius: radius,
                                     strokeWeight: 2,
@@ -374,10 +379,21 @@
                                 });
                                 markers.push(marker);
 
-
-                        });
+                                return getStationsInRadius(location.Ma, location.La, radius);
+                            })
+                            .catch(error => console.error('Error in geocoding address:', error));
+                        stationPromises.push(promise);
                     }
                 });
+
+                Promise.all(stationPromises)
+                    .then(() => {
+                        resolve({ locations: locations, radii: radii });
+                    })
+                    .catch(error => {
+                        console.error('Error processing stations data:', error);
+                        reject(error);
+                    });
 
                 // 기존 HTML 테이블 표시 로직...
                 var html = '<table class="dataframe">';
@@ -396,10 +412,17 @@
                     html += '</tbody></table>';
 
                     document.querySelector('#' + ' .dataframe-container').innerHTML = html;
-                })
-            .catch(error => console.error('Error loading or parsing the CSV:', error));
+            })
+            .catch(error => {
+                console.error('Error loading or parsing the CSV:', error);
+                reject(error);
+            });
+    });
+}
 
-	    return { locations: coordinates, radii: radii };
+
+
+                
     }
 	// 집회 장소 데이터를 기반으로 대중교통 경로를 검색하는 함수
 	async function findRoutesAvoidingProtests(startCoords, endCoords, cityName, map) {
@@ -408,24 +431,30 @@
 	    const endX = endCoords.getLng();
 	    const endY = endCoords.getLat();
 	
-	    var protestData = loadAndPlotData(cityName, map);
-	    var excludedStations = [];
+	    try {
+	        var protestData = await loadAndPlotData(cityName, map);
+	        var excludedStations = [];
 	
-	    // 모든 집회 장소에 대한 정류장 조회를 완료할 때까지 기다림
-	    await Promise.all(protestData.locations.map(async (location, index) => {
-	        await new Promise((resolve, reject) => {
-	            getStationsInRadius(location.x, location.y, protestData.radii[index], function(stations) {
-	                stations.forEach(function(station) {
-	                    excludedStations.push(station.stationName);
+	        // 각 집회 장소 주변의 정류장 조회
+	        await Promise.all(protestData.locations.map(async (location, index) => {
+	            await new Promise((resolve, reject) => {
+	                getStationsInRadius(location.lng, location.lat, protestData.radii[index], function(stations) {
+	                    stations.forEach(function(station) {
+	                        excludedStations.push(station.stationName);
+	                    });
+	                    resolve();
 	                });
-	                resolve();
 	            });
-	        });
-	    }));
+	        }));
 	
-	    // 모든 정류장 데이터 수집 후 경로 검색 로직 호출
-	    searchPubTransPathAJAX(startX, startY, endX, endY, excludedStations, map);
+	        // 경로 검색 로직 호출
+	        searchPubTransPathAJAX(startX, startY, endX, endY, excludedStations, map);
+	    } catch (error) {
+	        console.error('Error processing protest data:', error);
+	        // 적절한 에러 처리
+	    }
 	}
+
 
 		
 
