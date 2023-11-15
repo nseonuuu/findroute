@@ -322,13 +322,13 @@
 	
 	
 	
-	function loadCityData(city, sectionId) {
+	function loadCityData(city) {
 	    clearMap(sectionId);
 	    const cityData = cityCoordinates[city];
-	    var map = maps[sectionId]; // 기존 지도 객체 사용
+	    var map = new kakao.maps.Map(container, mapOptions);
 	
 	    if (!map) {
-	        console.error("지도 객체가 없습니다:", sectionId);
+	        console.error("지도 객체가 없습니다.");
 	        return;
 	    }
 		
@@ -336,7 +336,7 @@
 	    map.setLevel(cityData.zoom);
 	
 	    if (cityCodeMapping[city]) {
-	        loadAndPlotData(city, sectionId, map); // 이미 생성된 지도 객체 전달
+	        loadAndPlotData(city, map); // 이미 생성된 지도 객체 전달
 	    } else {
 	        console.log("Data for", city, "is not yet implemented or the city is not recognized.");
 	    }
