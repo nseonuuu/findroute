@@ -21,6 +21,16 @@
 		        <button id="trafficButton" onclick="toggleTraffic('Section1')">교통정보 표시</button>
 		        <button id="clearButton" onclick="clearMap('Section1')">마커 지우기</button>
 		    </div>
+			<form id="routeForm">
+			    <label for="start">출발지:</label>
+			    <input type="text" id="start" name="start" placeholder="예: 서울역">
+			
+			    <label for="end">목적지:</label>
+			    <input type="text" id="end" name="end" placeholder="예: 강남역">
+			
+			    <button type="submit">경로 찾기</button>
+			</form>
+
 		    <div class="city-section">
 		        <div id="map"></div>
 		        <div class="city-buttons">
@@ -73,18 +83,32 @@
 
 
 	
-	function searchPubTransPathAJAX() {
-		var xhr = new XMLHttpRequest();
-		//ODsay apiKey 입력
-		var url = "https://api.odsay.com/v1/api/searchPubTransPathT?SX="+sx+"&SY="+sy+"&EX="+ex+"&EY="+ey+"&apiKey=C+g5i6mKpx3QWTafGpAEBg"
-		xhr.send();
-		xhr.onreadystatechange = function() {
-			if (xhr.readyState == 4 && xhr.status == 200) {
-			console.log( JSON.parse(xhr.responseText) ); // <- xhr.responseText 로 결과를 가져올 수 있음
-			//노선그래픽 데이터 호출
-			callMapObjApiAJAX((JSON.parse(xhr.responseText))["result"]["path"][0].info.mapObj);
-			}
-		}
+	// ODsay API를 사용하여 대중교통 경로 검색
+	function searchPubTransPathAJAX(startX, startY, endX, endY, excludedStations, map) {
+	    var xhr = new XMLHttpRequest();
+	    var url = "https://api.odsay.com/v1/api/searchPubTransPathT?SX=" + startX + "&SY=" + startY + "&EX=" + endX + "&EY=" + endY + "&apiKey=C+g5i6mKpx3QWTafGpAEBg";
+	
+	    xhr.onreadystatechange = function() {
+	        if (xhr.readyState == 4 && xhr.status == 200) {
+	            var response = JSON.parse(xhr.responseText);
+	            var paths = response.result.path;
+	
+	            paths = paths.filter(function(path) {
+	                return path.stations.every(function(station) {
+	                    return !excludedStations.includes(station.stationName);
+	                });
+	            });
+	
+	            // 필터링된 경로 중 하나를 선택하여 callMapObjApiAJAX 함수 호출
+	            if (paths.length > 0) {
+	                var selectedPath = paths[0]; // 예시로 첫 번째 경로를 선택
+	                callMapObjApiAJAX(selectedPath.info.mapObj, map);
+	            }
+	        }
+	    };
+	
+	    xhr.open("GET", url, true);
+	    xhr.send();
 	}
 	
 	//길찾기 API 호출
@@ -113,6 +137,26 @@
 			}
 		}
 	}
+
+	document.getElementById('routeForm').addEventListener('submit', function(event) {
+	    event.preventDefault();
+	
+	    // 입력 폼에서 출발지와 목적지의 값을 가져옴
+	    var startAddress = document.getElementById('start').value;
+	    var endAddress = document.getElementById('end').value;
+	
+	    // 출발지 주소를 좌표로 변환
+	    geocodeAddress(startAddress, function(startCoords) {
+	        // 목적지 주소를 좌표로 변환
+	        geocodeAddress(endAddress, function(endCoords) {
+	            // 변환된 좌표를 사용하여 경로 검색 함수 호출
+	            findRoutesAvoidingProtests(startCoords, endCoords);
+	        });
+	    });
+	});
+
+
+	
 	
 	// 지도위 마커 표시해주는 함수
 	function drawKakaoMarker(x,y){
@@ -159,7 +203,73 @@
 			}
 		}
 	}
+	
+    	// Mapping of city names to their codes
+	const cityCodeMapping = {
+	    "서울": "SU",
+	    "부산": "PS",
+	    "대구": "DG",
+	    "인천": "IC",
+	    "광주": "KJ",
+	    "대전": "DJ",
+	    "울산": "WS",
+	    "세종": "SJ",
+	    "경기남부": "KN",
+	    "경기북부": "KB",
+	    "강원": "KW",
+	    "충북": "CB",
+	    "충남": "CN",
+	    "전북": "JB",
+	    "전남": "JN",
+	    "경북": "SB",
+	    "경남": "SN",
+	    "제주": "JJ"
+	};
+	
+	const cityCoordinates = {
+	    "서울": { lat: 37.55191813, lng: 126.9918238, zoom: 9 },
+	    "부산": { lat: 35.21033858, lng: 129.0691138, zoom: 9 },
+	    "대구": { lat: 35.8298146, lng: 128.5653587, zoom: 9 },
+	    "인천": { lat: 37.58457102, lng: 126.3755151, zoom: 9 },
+	    "광주": { lat: 35.15572822, lng: 126.8354348, zoom: 9 },
+	    "대전": { lat: 36.3397636, lng: 127.3940388, zoom: 9 },
+	    "울산": { lat: 35.55422196, lng: 129.237579, zoom: 9 },
+	    "세종": { lat: 36.56072897, lng: 127.258722, zoom: 9 },
+	    "경기남부": { lat: 37.53434923, lng: 127.1810501, zoom: 11 },
+	    "경기북부": { lat: 37.53434923, lng: 127.1810501, zoom: 11 },
+	    "강원": { lat: 37.71904264, lng: 128.3008969, zoom: 11 },
+	    "충북": { lat: 36.73877678, lng: 127.8313457, zoom: 11 },
+	    "충남": { lat: 36.52940199, lng: 126.8497393, zoom: 11 },
+	    "전북": { lat: 35.71581062, lng: 127.1427384, zoom: 11 },
+	    "전남": { lat: 34.87817002, lng: 126.9052332, zoom: 11 },
+	    "경북": { lat: 36.34862579, lng: 128.748716, zoom: 11 },
+	    "경남": { lat: 35.32449891, lng: 128.2611748, zoom: 11 },
+	    "제주": { lat: 33.38699923, lng: 126.5538395, zoom: 10 }
+	};
+	
+	
+	
+	function loadCityData(city) {
+	    clearMap(sectionId);
+	    const cityData = cityCoordinates[city];
+	    var map = new kakao.maps.Map(container, mapOptions);
+	
+	    if (!map) {
+	        console.error("지도 객체가 없습니다.");
+	        return;
+	    }
+		
+	    map.setCenter(new kakao.maps.LatLng(cityData.lat, cityData.lng));
+	    map.setLevel(cityData.zoom);
+	
+	    if (cityCodeMapping[city]) {
+	        loadAndPlotData(city, map); // 이미 생성된 지도 객체 전달
+	    } else {
+	        console.log("Data for", city, "is not yet implemented or the city is not recognized.");
+	    }
+	}
 
+	
     // 주소를 좌표로 변환하는 함수
     function geocodeAddress(address, callback) {
         var geocoder = new kakao.maps.services.Geocoder();
@@ -176,7 +286,7 @@
 
     // ODSay API를 사용하여 반경 내의 지하철역과 버스 정류장 조회
     function getStationsInRadius(x, y, radius, map, callback) {
-        const url = `https://api.odsay.com/v1/api/pointBusStation?apiKey=${ODSAY_API_KEY}&x=${x}&y=${y}&radius=${radius}`;
+        const url = `https://api.odsay.com/v1/api/pointBusStation?apiKey=C+g5i6mKpx3QWTafGpAEBg&x=${x}&y=${y}&radius=${radius}`;
 
         fetch(url)
             .then(response => response.json())
@@ -205,7 +315,7 @@
             })
             .catch(error => console.error('Error fetching ODSay API:', error));
     }
-        // 집회 데이터를 처리하고 지하철역 및 버스 정류장 조회
+    // 집회 데이터를 처리하고 지하철역 및 버스 정류장 조회
     function loadAndPlotData(cityName, map) {
         const filename = `RT_${cityCodeMapping[cityName]}_Update.csv`;
         var markers = [];
@@ -275,72 +385,30 @@
                     document.querySelector('#' + ' .dataframe-container').innerHTML = html;
                 })
             .catch(error => console.error('Error loading or parsing the CSV:', error));
-    }
 
-	// Mapping of city names to their codes
-	const cityCodeMapping = {
-	    "서울": "SU",
-	    "부산": "PS",
-	    "대구": "DG",
-	    "인천": "IC",
-	    "광주": "KJ",
-	    "대전": "DJ",
-	    "울산": "WS",
-	    "세종": "SJ",
-	    "경기남부": "KN",
-	    "경기북부": "KB",
-	    "강원": "KW",
-	    "충북": "CB",
-	    "충남": "CN",
-	    "전북": "JB",
-	    "전남": "JN",
-	    "경북": "SB",
-	    "경남": "SN",
-	    "제주": "JJ"
-	};
+	    return { locations: coordinates, radii: radii };
+    }
+	// 집회 장소 데이터를 기반으로 대중교통 경로를 검색하는 함수
+	function findRoutesAvoidingProtests(cityName, map) {
+	    var protestData = loadAndPlotData(cityName, map);
+	    var excludedStations = [];
 	
-	const cityCoordinates = {
-	    "서울": { lat: 37.55191813, lng: 126.9918238, zoom: 9 },
-	    "부산": { lat: 35.21033858, lng: 129.0691138, zoom: 9 },
-	    "대구": { lat: 35.8298146, lng: 128.5653587, zoom: 9 },
-	    "인천": { lat: 37.58457102, lng: 126.3755151, zoom: 9 },
-	    "광주": { lat: 35.15572822, lng: 126.8354348, zoom: 9 },
-	    "대전": { lat: 36.3397636, lng: 127.3940388, zoom: 9 },
-	    "울산": { lat: 35.55422196, lng: 129.237579, zoom: 9 },
-	    "세종": { lat: 36.56072897, lng: 127.258722, zoom: 9 },
-	    "경기남부": { lat: 37.53434923, lng: 127.1810501, zoom: 11 },
-	    "경기북부": { lat: 37.53434923, lng: 127.1810501, zoom: 11 },
-	    "강원": { lat: 37.71904264, lng: 128.3008969, zoom: 11 },
-	    "충북": { lat: 36.73877678, lng: 127.8313457, zoom: 11 },
-	    "충남": { lat: 36.52940199, lng: 126.8497393, zoom: 11 },
-	    "전북": { lat: 35.71581062, lng: 127.1427384, zoom: 11 },
-	    "전남": { lat: 34.87817002, lng: 126.9052332, zoom: 11 },
-	    "경북": { lat: 36.34862579, lng: 128.748716, zoom: 11 },
-	    "경남": { lat: 35.32449891, lng: 128.2611748, zoom: 11 },
-	    "제주": { lat: 33.38699923, lng: 126.5538395, zoom: 10 }
-	};
+	    // 집회 장소 반경 내의 정류장을 조회하여 excludedStations 배열에 추가
+	    protestData.locations.forEach(function(location, index) {
+	        getStationsInRadius(location.x, location.y, protestData.radii[index], function(stations) {
+	            stations.forEach(function(station) {
+	                excludedStations.push(station.stationName);
+	            });
+	        });
+	    });
 	
-	
-	
-	function loadCityData(city) {
-	    clearMap(sectionId);
-	    const cityData = cityCoordinates[city];
-	    var map = new kakao.maps.Map(container, mapOptions);
-	
-	    if (!map) {
-	        console.error("지도 객체가 없습니다.");
-	        return;
-	    }
-		
-	    map.setCenter(new kakao.maps.LatLng(cityData.lat, cityData.lng));
-	    map.setLevel(cityData.zoom);
-	
-	    if (cityCodeMapping[city]) {
-	        loadAndPlotData(city, map); // 이미 생성된 지도 객체 전달
-	    } else {
-	        console.log("Data for", city, "is not yet implemented or the city is not recognized.");
-	    }
+	    // 경로 검색 로직 호출
+	    // 예: 서울역에서 강남역까지의 경로 검색
+	    searchPubTransPathAJAX(startCoords.Ma, startCoords.La, endCoords.Ma, endCoords.La, excludedStations, map);
 	}
+		
+
+
 
 
 	
