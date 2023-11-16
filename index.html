@@ -155,8 +155,13 @@
 	        // 사용자에게 오류 메시지 표시
 	    }
 	});
+
+
+
+
 	
 	function getCoordinates(address) {
+   	    console.log("Address for geocoding:", address); // 콘솔 로깅 추가
 	    return new Promise((resolve, reject) => {
 	        geocodeAddress(address, function (coords) {
 	            if (coords) {
